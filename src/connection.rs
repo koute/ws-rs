@@ -981,8 +981,10 @@ where
                                 return Err(Error::new(Kind::Capacity, "Exceeded max total fragments size."));
                             }
 
-                            self.fragments_total_size += frame.len();
-                            self.fragments.push_back(frame);
+                            if !frame.is_empty() {
+                                self.fragments_total_size += frame.len();
+                                self.fragments.push_back(frame);
+                            }
                         }
                     }
                 }
