@@ -88,6 +88,7 @@ where
     events: Ready,
 
     fragments: VecDeque<Frame>,
+    fragments_total_size: usize,
 
     in_buffer: CircularBuffer,
     out_buffer: CircularBuffer,
@@ -121,6 +122,7 @@ where
             endpoint: Endpoint::Server,
             events: Ready::empty(),
             fragments: VecDeque::with_capacity(settings.fragments_capacity),
+            fragments_total_size: 0,
             in_buffer: CircularBuffer::new(
                 settings.in_buffer_capacity,
                 settings.in_buffer_capacity_hard_limit,
@@ -898,9 +900,15 @@ where
                         OpCode::Continue => {
                             trace!("Received final fragment {:?}", frame);
                             if let Some(first) = self.fragments.pop_front() {
-                                let size = self.fragments.iter().fold(
-                                    first.payload().len() + frame.payload().len(),
-                                    |len, frame| len + frame.payload().len(),
+                                let size = self.fragments_total_size;
+                                self.fragments_total_size -= first.len();
+
+                                debug_assert_eq!(
+                                    size,
+                                    self.fragments.iter().fold(
+                                        first.payload().len() + frame.payload().len(),
+                                        |len, frame| len + frame.payload().len(),
+                                    )
                                 );
                                 match first.opcode() {
                                     OpCode::Text => {
@@ -908,6 +916,7 @@ where
                                         let mut data = Vec::with_capacity(size);
                                         data.extend(first.into_data());
                                         while let Some(frame) = self.fragments.pop_front() {
+                                            self.fragments_total_size -= frame.len();
                                             data.extend(frame.into_data());
                                         }
                                         data.extend(frame.into_data());
@@ -927,6 +936,7 @@ where
                                         data.extend(first.into_data());
 
                                         while let Some(frame) = self.fragments.pop_front() {
+                                            self.fragments_total_size -= frame.len();
                                             data.extend(frame.into_data());
                                         }
 
@@ -967,7 +977,12 @@ where
                         {
                             return Err(Error::new(Kind::Capacity, "Exceeded max fragments."));
                         } else {
-                            self.fragments.push_back(frame)
+                            if self.fragments_total_size + frame.len() > self.settings.max_total_fragments_size {
+                                return Err(Error::new(Kind::Capacity, "Exceeded max total fragments size."));
+                            }
+
+                            self.fragments_total_size += frame.len();
+                            self.fragments.push_back(frame);
                         }
                     }
                 }

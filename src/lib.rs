@@ -160,9 +160,12 @@ pub struct Settings {
     /// The maximum length of outgoing frames. Messages longer than this will be fragmented.
     /// Default: 65,535
     pub fragment_size: usize,
-    /// The maximum length of acceptable incoming frames. Messages longer than this will be rejected.
+    /// The maximum length of a single frame. Frames longer than this will be rejected.
     /// Default: unlimited
     pub max_fragment_size: usize,
+    /// The maximum total length of all incoming frames. Messages longer than this will be rejected.
+    /// Default: unlimited
+    pub max_total_fragments_size: usize,
     /// The initial size of the incoming buffer. A larger buffer uses more memory but will allow for
     /// fewer reallocations.
     /// Default: 2048
@@ -263,6 +266,7 @@ impl Default for Settings {
             fragments_grow: true,
             fragment_size: u16::max_value() as usize,
             max_fragment_size: usize::max_value(),
+            max_total_fragments_size: usize::max_value(),
             in_buffer_capacity: 2048,
             in_buffer_capacity_hard_limit: 10 * 1024 * 1024,
             in_buffer_capacity_soft_limit: 1024 * 1024,
