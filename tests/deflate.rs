@@ -45,11 +45,11 @@ fn fragment() {
 
     let mut name = "Client";
 
+    let mut settings = Settings::default();
+    settings.fragment_size = 4;
+
     let mut ws = Builder::new()
-        .with_settings(Settings {
-            fragment_size: 4,
-            ..Default::default()
-        })
+        .with_settings(settings)
         .build(|output: Sender| {
             if name == "Client" {
                 output.send(MESSAGE).unwrap();
