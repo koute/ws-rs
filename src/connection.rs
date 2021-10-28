@@ -908,6 +908,10 @@ where
                                     self.fragments.iter().map(|frame| frame.payload().len()).sum()
                                 );
 
+                                if size > self.settings.max_total_fragments_size {
+                                    return Err(Error::new(Kind::Capacity, "Exceeded max total fragments size."));
+                                }
+
                                 match first.opcode() {
                                     OpCode::Text => {
                                         trace!("Constructing text message from fragments: {:?} -> {:?} -> {:?}", first, self.fragments.iter().collect::<Vec<&Frame>>(), frame);
