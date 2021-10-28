@@ -1,4 +1,4 @@
-use std::mem;
+use std::mem::{self, MaybeUninit};
 use std::slice;
 
 use super::ffi;
@@ -67,9 +67,9 @@ impl Compressor {
         debug_assert!(window_bits <= 15, "Received too large window size.");
 
         unsafe {
-            let mut stream: Box<ffi::z_stream> = Box::new(mem::zeroed());
+            let mut stream: Box<MaybeUninit<ffi::z_stream>> = Box::new(MaybeUninit::zeroed());
             let result = ffi::deflateInit2_(
-                stream.as_mut(),
+                stream.as_mut_ptr(),
                 9,
                 ffi::Z_DEFLATED,
                 -window_bits as c_int,
@@ -79,6 +79,9 @@ impl Compressor {
                 mem::size_of::<ffi::z_stream>() as c_int,
             );
             assert!(result == ffi::Z_OK, "Failed to initialize compresser.");
+
+            // SAFETY: This is exactly what the (currently unstable) Box::assume_init does.
+            let stream = Box::from_raw(Box::into_raw(stream) as *mut ffi::z_stream);
             Compressor { stream: stream }
         }
     }
@@ -139,14 +142,17 @@ impl Decompressor {
         debug_assert!(window_bits <= 15, "Received too large window size.");
 
         unsafe {
-            let mut stream: Box<ffi::z_stream> = Box::new(mem::zeroed());
+            let mut stream: Box<MaybeUninit<ffi::z_stream>> = Box::new(MaybeUninit::zeroed());
             let result = ffi::inflateInit2_(
-                stream.as_mut(),
+                stream.as_mut_ptr(),
                 -window_bits as c_int,
                 ZLIB_VERSION.as_ptr() as *const c_char,
                 mem::size_of::<ffi::z_stream>() as c_int,
             );
             assert!(result == ffi::Z_OK, "Failed to initialize decompresser.");
+
+            // SAFETY: This is exactly what the (currently unstable) Box::assume_init does.
+            let stream = Box::from_raw(Box::into_raw(stream) as *mut ffi::z_stream);
             Decompressor { stream: stream }
         }
     }
