@@ -900,25 +900,25 @@ where
                         OpCode::Continue => {
                             trace!("Received final fragment {:?}", frame);
                             if let Some(first) = self.fragments.pop_front() {
-                                let size = self.fragments_total_size;
-                                self.fragments_total_size -= first.len();
+                                let size = self.fragments_total_size + frame.payload().len();
+                                self.fragments_total_size -= first.payload().len();
 
                                 debug_assert_eq!(
-                                    size,
-                                    self.fragments.iter().fold(
-                                        first.payload().len() + frame.payload().len(),
-                                        |len, frame| len + frame.payload().len(),
-                                    )
+                                    self.fragments_total_size,
+                                    self.fragments.iter().map(|frame| frame.payload().len()).sum()
                                 );
+
                                 match first.opcode() {
                                     OpCode::Text => {
                                         trace!("Constructing text message from fragments: {:?} -> {:?} -> {:?}", first, self.fragments.iter().collect::<Vec<&Frame>>(), frame);
                                         let mut data = Vec::with_capacity(size);
                                         data.extend(first.into_data());
                                         while let Some(frame) = self.fragments.pop_front() {
-                                            self.fragments_total_size -= frame.len();
+                                            self.fragments_total_size -= frame.payload().len();
                                             data.extend(frame.into_data());
                                         }
+
+                                        debug_assert_eq!(self.fragments_total_size, 0);
                                         data.extend(frame.into_data());
 
                                         let string = String::from_utf8(data)
@@ -936,10 +936,11 @@ where
                                         data.extend(first.into_data());
 
                                         while let Some(frame) = self.fragments.pop_front() {
-                                            self.fragments_total_size -= frame.len();
+                                            self.fragments_total_size -= frame.payload().len();
                                             data.extend(frame.into_data());
                                         }
 
+                                        debug_assert_eq!(self.fragments_total_size, 0);
                                         data.extend(frame.into_data());
 
                                         trace!(
@@ -982,8 +983,13 @@ where
                             }
 
                             if !frame.is_empty() {
-                                self.fragments_total_size += frame.len();
+                                self.fragments_total_size += frame.payload().len();
                                 self.fragments.push_back(frame);
+
+                                debug_assert_eq!(
+                                    self.fragments_total_size,
+                                    self.fragments.iter().map(|frame| frame.payload().len()).sum()
+                                );
                             }
                         }
                     }
